@@ -51,8 +51,8 @@ class Model():
         train_dataset = BPRData(train_data, self.itemNum, self.trainMat, self.args.num_ng, True)
         self.train_loader = dataloader.DataLoader(train_dataset, batch_size=self.args.batch, shuffle=True, num_workers=0)
         #valid data
-        valid_dataset = BPRData(validData, self.itemNum, self.trainMat, 0, False)
-        self.valid_loader  = dataloader.DataLoader(valid_dataset, batch_size=args.test_batch*101, shuffle=False, num_workers=0)
+        # valid_dataset = BPRData(validData, self.itemNum, self.trainMat, 0, False)
+        # self.valid_loader  = dataloader.DataLoader(valid_dataset, batch_size=args.test_batch*101, shuffle=False, num_workers=0)
         
         #test_data
         test_dataset = BPRData(testData, self.itemNum, self.trainMat, 0, False)
@@ -85,7 +85,7 @@ class Model():
         self.setRandomSeed()
         self.hide_dim = args.hide_dim
         self.model = GraphRec(self.args, self.hide_dim, self.trainMat, self.trustMat, device_gpu).cuda()
-        self.opt = t.optim.Adam(self.model.parameters(), lr = self.args.lr, weight_decay=self.args.reg)
+        self.opt = t.optim.Adam(self.model.parameters(), lr = self.args.lr, weight_decay=0)
 
     def innerProduct(self, u, i, j):
         pred_i = t.sum(t.mul(u,i), dim=1)
@@ -110,10 +110,10 @@ class Model():
             self.train_loss.append(epoch_loss)
             log("epoch %d/%d, epoch_loss=%.2f"% (e, self.args.epochs, epoch_loss))
             
-            HR, NDCG = self.validModel(self.valid_loader)
+            HR, NDCG = self.validModel(self.test_loader)
             self.his_hr.append(HR)
             self.his_ndcg.append(NDCG)
-            log("epoch %d/%d, valid HR = %.4f, valid NDCG = %.4f"%(e, self.args.epochs, HR, NDCG))
+            log("epoch %d/%d, test HR = %.4f, test NDCG = %.4f"%(e, self.args.epochs, HR, NDCG))
             # if e%10 == 0 and e != 0:
             # log(self.getModelName())
             # HR, NDCG = self.test()
@@ -122,7 +122,7 @@ class Model():
                 best_HR = HR
                 cvWait = 0
                 best_epoch = self.curEpoch
-                self.saveModel()
+                # self.saveModel()
             else:
                 cvWait += 1
                 log("cvWait = %d"%(cvWait))
@@ -131,9 +131,9 @@ class Model():
 
             if cvWait == self.args.patience:
                 log('Early stopping! best epoch = %d'%(best_epoch))
-                self.loadModel(self.modelName)
-                HR, NDCG = self.validModel(self.test_loader)
-                log("epoch %d/%d, test HR = %.4f, test NDCG = %.4f"%(e, self.args.epochs, HR, NDCG))
+                # self.loadModel(self.modelName)
+                # HR, NDCG = self.validModel(self.test_loader)
+                # log("epoch %d/%d, test HR = %.4f, test NDCG = %.4f"%(e, self.args.epochs, HR, NDCG))
                 break
         
         
@@ -164,10 +164,10 @@ class Model():
             pred_i, pred_j = self.innerProduct(userEmbed, posEmbed, negEmbed)
 
             bprloss = - (pred_i.view(-1) - pred_j.view(-1)).sigmoid().log().sum()
-            # regLoss = (t.norm(userEmbed) ** 2 + t.norm(posEmbed) ** 2 + t.norm(negEmbed) ** 2)
+            regLoss = (t.norm(userEmbed) ** 2 + t.norm(posEmbed) ** 2 + t.norm(negEmbed) ** 2)
 
-            # loss = 0.5*(bprloss + self.args.reg * regLoss)/self.args.batch
-            loss = bprloss/self.args.batch
+            loss = (bprloss + self.args.reg * regLoss)/self.args.batch
+            # loss = bprloss/self.args.batch
             epoch_loss += bprloss.item()
             self.opt.zero_grad()
             loss.backward()
@@ -288,5 +288,5 @@ if __name__ == '__main__':
     print('ModelNmae = ' + modelName)
 
     hope.run()
-    hope.test()
+    # hope.test()
 
