@@ -75,7 +75,7 @@ class Model():
         random.seed(self.args.seed)
     
     def getData(self, args):
-        data = loadData(args.dataset, args.cv)
+        data = loadData(args.dataset)
         trainMat, testData, validData, trustMat = data
         return trainMat, testData, validData, trustMat
 
@@ -180,6 +180,7 @@ class Model():
             loss.backward()
             self.opt.step()
             log('step_loss = %f'%(loss.item()), save=False, oneline=True)
+        log("\n")
         log("finish train")
         return epoch_loss
 
@@ -211,7 +212,7 @@ class Model():
 
     def getModelName(self):
         title = "GraphRec_"
-        ModelName = title + self.args.dataset + "_" + str(self.args.cv) + "_"+ modelUTCStr + \
+        ModelName = title + self.args.dataset + "_" + modelUTCStr + \
         "_reg_" + str(self.args.reg)+ \
         "_batch_" + str(self.args.batch) + \
         "_lr_" + str(self.args.lr) + \
@@ -270,12 +271,11 @@ if __name__ == '__main__':
     #dataset params
     parser.add_argument('--dataset', type=str, default="Yelp", help="Yelp")
     parser.add_argument('--seed', type=int, default=29)
-    parser.add_argument('--cv', type=int, default=1)
 
-    parser.add_argument('--hide_dim', type=int, default=16)
+    parser.add_argument('--hide_dim', type=int, default=8)
 
     parser.add_argument('--reg', type=float, default=0.01)
-    parser.add_argument('--batch', type=int, default=2048)
+    parser.add_argument('--batch', type=int, default=4096)
     parser.add_argument('--lr', type=float, default=0.005)
     parser.add_argument('--minlr', type=float, default=0.0001)
     # parser.add_argument('--decay', type=float, default=0.98)
@@ -289,7 +289,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print(args)
-    args.dataset = args.dataset + "_time"
     args.time = 0
     args.time_step = 0
     mkdir(args.dataset)
