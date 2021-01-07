@@ -75,7 +75,7 @@ class Model():
         random.seed(self.args.seed)
     
     def getData(self, args):
-        data = loadData(args.dataset)
+        data = loadData(args.dataset, args.cv)
         trainMat, testData, validData, trustMat = data
         return trainMat, testData, validData, trustMat
 
@@ -86,11 +86,16 @@ class Model():
         self.hide_dim = args.hide_dim
         self.model = GraphRec(self.args, self.hide_dim, self.trainMat, self.trustMat, device_gpu).cuda()
         self.opt = t.optim.Adam(self.model.parameters(), lr = self.args.lr, weight_decay=0)
+        # self.opt = t.optim.RMSprop(self.model.parameters(), lr=args.lr, alpha=0.9)
 
     def innerProduct(self, u, i, j):
         pred_i = t.sum(t.mul(u,i), dim=1)
         pred_j = t.sum(t.mul(u,j), dim=1)
         return pred_i, pred_j
+
+    def adjust_learning_rate(self, opt, epoch):
+        for param_group in opt.param_groups:
+            param_group['lr'] = max(param_group['lr'] * self.args.decay, self.args.minlr)
 
     def run(self):
         #判断是导入模型还是重新训练模型
@@ -118,6 +123,7 @@ class Model():
             # log(self.getModelName())
             # HR, NDCG = self.test()
 
+            # self.adjust_learning_rate(self.opt, e)
             if HR > best_HR:
                 best_HR = HR
                 cvWait = 0
@@ -131,6 +137,7 @@ class Model():
 
             if cvWait == self.args.patience:
                 log('Early stopping! best epoch = %d'%(best_epoch))
+                log("model name : %s"%(self.modelName))
                 # self.loadModel(self.modelName)
                 # HR, NDCG = self.validModel(self.test_loader)
                 # log("epoch %d/%d, test HR = %.4f, test NDCG = %.4f"%(e, self.args.epochs, HR, NDCG))
@@ -204,12 +211,14 @@ class Model():
 
     def getModelName(self):
         title = "GraphRec_"
-        ModelName = title + self.args.dataset + "_" + modelUTCStr + \
+        ModelName = title + self.args.dataset + "_" + str(self.args.cv) + "_"+ modelUTCStr + \
         "_reg_" + str(self.args.reg)+ \
         "_batch_" + str(self.args.batch) + \
         "_lr_" + str(self.args.lr) + \
         "_hide_" + str(self.args.hide_dim) + \
-        "_top_" + str(self.args.top_k)
+        "_top_" + str(self.args.top_k) + \
+        "_act_" + self.args.act
+        # "_decay_" + str(self.args.decay) + \
         return ModelName
 
 
@@ -257,16 +266,19 @@ class Model():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='NGCF main.py')
+    parser = argparse.ArgumentParser(description='GraphRec main.py')
     #dataset params
     parser.add_argument('--dataset', type=str, default="Yelp", help="Yelp")
     parser.add_argument('--seed', type=int, default=29)
+    parser.add_argument('--cv', type=int, default=1)
 
     parser.add_argument('--hide_dim', type=int, default=16)
 
-    parser.add_argument('--reg', type=float, default=0.001)
-    parser.add_argument('--batch', type=int, default=4096)
-    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--reg', type=float, default=0.01)
+    parser.add_argument('--batch', type=int, default=2048)
+    parser.add_argument('--lr', type=float, default=0.005)
+    parser.add_argument('--minlr', type=float, default=0.0001)
+    # parser.add_argument('--decay', type=float, default=0.98)
     parser.add_argument('--test_batch', type=int, default=2048)
     parser.add_argument('--epochs', type=int, default=180)
     #early stop params
@@ -277,7 +289,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print(args)
-    args.dataset = args.dataset
+    args.dataset = args.dataset + "_time"
     args.time = 0
     args.time_step = 0
     mkdir(args.dataset)
